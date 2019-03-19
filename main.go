@@ -2,15 +2,39 @@ package main
 
 import (
 	"aproj/controllers"
+	"aproj/models"
+	"fmt"
+	"log"
 
 	"net/http"
 
 	"github.com/gorilla/mux"
+	_ "github.com/jinzhu/gorm/dialects/postgres"
+	_ "github.com/lib/pq"
+)
+
+const (
+	host     = "localhost"
+	port     = 5432
+	user     = "postgres"
+	password = "mysecretpassword"
+	dbname   = "adb"
 )
 
 func main() {
+	pgConnection := fmt.Sprintf("host=%s port=%d user=%s password = %s dbname = %s sslmode = disable",
+		host, port, user, password, dbname)
+
+	us, err := models.NewUserService(pgConnection)
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+
+	defer us.Close()
+	us.AutoMigrate()
+
 	pageC := controllers.NewStatic()
-	usersController := controllers.NewUsers()
+	usersController := controllers.NewUsers(us)
 
 	r := mux.NewRouter()
 
