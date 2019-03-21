@@ -45,6 +45,9 @@ func main() {
 	r.HandleFunc("/signup", usersController.New).Methods("GET")
 	r.HandleFunc("/signup", usersController.Create).Methods("POST")
 
+	r.Handle("/login", usersController.LogInView).Methods("GET")
+	r.HandleFunc("/login", usersController.Login).Methods("POST")
+
 	http.Handle("/favicon.ico", http.NotFoundHandler())
 	http.ListenAndServe(":8080", r)
 }

@@ -11,8 +11,10 @@ import (
 )
 
 var (
-	ErrorNotFound  = errors.New("Models: resource not found.")
-	ErrorInvalidID = errors.New("Models: Invalid ID.")
+	ErrorNotFound          = errors.New("Models: resource not found.")
+	ErrorInvalidID         = errors.New("Models: Invalid ID.")
+	ErrorIncorrectPassword = errors.New("Models: Incorrect password.")
+	secretString           = "dirty-secret-string"
 )
 
 type UserService struct {
@@ -23,7 +25,7 @@ type User struct {
 	gorm.Model
 	Name         string
 	Email        string `gorm:"not null;unique_index"`
-	Passowrd     string `gorm:"-"`
+	Password     string `gorm:"-"`
 	PasswordHash string `gorm:"not null"`
 }
 
@@ -74,12 +76,13 @@ func (us *UserService) ByEmail(email string) (*User, error) {
 }
 
 func (us *UserService) Create(user *User) error {
-	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(user.Passowrd), bcrypt.DefaultCost)
+	pswBytes := []byte(user.Password + secretString)
+	hashedBytes, err := bcrypt.GenerateFromPassword(pswBytes, bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
 
-	user.Passowrd = string(hashedBytes)
+	user.Password = string(hashedBytes)
 	user.PasswordHash = ""
 
 	return us.db.Create(user).Error
@@ -113,4 +116,21 @@ func (us *UserService) HardReset() error {
 	}
 
 	return us.AutoMigrate()
+}
+
+func (us *UserService) Authentication(email, password string) (*User, error) {
+	foundUser, err := us.ByEmail(email)
+	if err != nil {
+		return nil, err
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(foundUser.PasswordHash), []byte(password+secretString))
+	switch err {
+	case nil:
+		return foundUser, nil
+	case bcrypt.ErrMismatchedHashAndPassword:
+		return nil, ErrorIncorrectPassword
+	default:
+		return nil, err
+	}
 }
