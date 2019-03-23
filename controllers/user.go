@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"aproj/models"
+	"aproj/utils"
 	"aproj/views"
 	"fmt"
 	"log"
@@ -23,6 +24,28 @@ type SignupForm struct {
 type LoginForm struct {
 	Email    string `schema:"email"`
 	Password string `schema:"password"`
+}
+
+func (u *Users) signIn(w http.ResponseWriter, user *models.User) error {
+	if user.Remember == "" {
+		token, err := utils.RememberToken()
+		if err != nil {
+			return err
+		}
+		user.Remember = token
+		err = u.us.Update(user)
+		if err != nil {
+			return err
+		}
+	}
+
+	cookie := http.Cookie{
+		Name:     "remember_token",
+		Value:    user.Remember,
+		HttpOnly: true,
+	}
+	http.SetCookie(w, &cookie)
+	return nil
 }
 
 func NewUsers(us *models.UserService) *Users {
@@ -55,7 +78,13 @@ func (u *Users) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprintln(w, "User is ", user)
+	err := u.signIn(w, &user)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/", http.StatusFound)
 }
 
 func (u *Users) Login(w http.ResponseWriter, r *http.Request) {
@@ -75,4 +104,12 @@ func (u *Users) Login(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+
+	err = u.signIn(w, user)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/", http.StatusFound)
 }
